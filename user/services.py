@@ -145,6 +145,8 @@ class BaseUserService:
         user.save()
         
         return user
+    
+    
 class BasePassengerUserService:
     model_class = User
     base_user_validation_service = BaseUserValidationService()

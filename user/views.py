@@ -3,6 +3,7 @@ from rest_framework import generics, status, views, viewsets
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 
 
 from .serializers import BaseUserSerializer, UserCreateTokenSerializer, TokenSerializer, BaseUserCreatePasswordRetypeSerializer, BaseUserActivationSerializer, BaseUserPasswordChangeSerializer, BaseUserPasswordForgotSerializer, BaseUserPasswordForgotActivationSerializer
@@ -113,3 +114,14 @@ class BaseUserPasswordForgotActivationViewset(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user = self.service_class.forget_password_activation(serializer.data)
         return Response({"detail" : "user password has been updated"}, status=status.HTTP_200_OK)
+    
+    
+class BaseUserProfileViewSet(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = BaseUserSerializer
+    
+    def get(self, request, *args, **kwargs):
+        self.get_object = request.user
+        serializer = self.get_serializer(self.get_object)
+        return Response(serializer.data)
