@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model, authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import APIException, ValidationError
+from django.http import Http404
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.tokens import default_token_generator
@@ -26,6 +27,8 @@ class BaseUserValidationService:
         
         if not user or not user.is_active:
             raise APIException(detail="Unable to log in with provided credentials.", code=status.HTTP_201_CREATED)
+        
+        return user
     
     def validate_password(self, user, password):
         try:
@@ -61,10 +64,34 @@ class BaseUserValidationService:
                 {"token": "Invalid token for given user."}, code=key_error
             )
             
+    def validate_current_password(self, user, validated_data, **kwargs):
+        is_password_valid  = user.check_password(validated_data.get('current_password', ""))
+        
+        if not is_password_valid:
+            key_error = "invalid_password"
+            raise APIException({"password": "Invalid password."}, code=key_error)
 
+
+class TokenCreateService:
+    model_class = Token
+    base_user_validation_service = BaseUserValidationService()
+    
+    def create(self, request):
+        user = self.base_user_validation_service.check_user_authentication(request)
+        token, _ = Token.objects.get_or_create(user=user)
+        return token
+    
+    def get_activation_token_url(self, user):
+        uid = encode_uid(user.pk)
+        token = default_token_generator.make_token(user)
+        url = f'{uid}/{token}'
+        return url
+    
+    
 class BaseUserService:
     model_class = User
     base_user_validation_service = BaseUserValidationService()
+    token_service = TokenCreateService()
     
     def create(self, validated_data, **kwargs):
         groups = validated_data.pop("groups")
@@ -88,7 +115,36 @@ class BaseUserService:
         
         return user
     
+    def update_password(self, user, validated_data, **kwargs):
+        self.base_user_validation_service.validate_current_password(user, validated_data)
+        self.base_user_validation_service.validate_password_with_retype_password(validated_data.get('new_password'), validated_data.get('re_type_new_password'))
+        
+        user.set_password(validated_data["new_password"])
+        user.save()
+
+        return user
     
+    def get_user_by_email(self, email):
+        try:
+            return self.model_class.objects.get(email=email, is_active=True)
+        except self.model_class.DoesNotExist:
+            raise Http404
+        
+    
+    def forget_password_url(self,validated_data, **kwargs):
+        user = self.get_user_by_email(validated_data["email"])
+        url = self.token_service.get_activation_token_url(user)
+        return url
+    
+    def forget_password_activation(self, validated_data, **kwargs):
+        user = self.base_user_validation_service.get_user_from_validated_uid(validated_data)
+        self.base_user_validation_service.validate_activation_token(user, validated_data)
+        self.base_user_validation_service.validate_password_with_retype_password(validated_data.get('password'), validated_data.get('re_type_password'))
+        
+        user.set_password(validated_data["password"])
+        user.save()
+        
+        return user
 class BasePassengerUserService:
     model_class = User
     base_user_validation_service = BaseUserValidationService()
@@ -107,17 +163,3 @@ class BasePassengerUserService:
         return instance 
         
 
-class TokenCreateService:
-    model_class = Token
-    base_user_validation_service = BaseUserValidationService()
-    
-    def create(self, request):
-        self.base_user_validation_service.check_user_authentication(request)
-        token, _ = Token.objects.get_or_create(user=self.user)
-        return token
-    
-    def get_activation_token_url(self, user):
-        uid = encode_uid(user.pk)
-        token = default_token_generator.make_token(user)
-        url = f'{uid}/{token}'
-        return url

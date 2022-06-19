@@ -58,3 +58,20 @@ class BaseUserCreatePasswordRetypeSerializer(serializers.ModelSerializer):
 class BaseUserActivationSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
+    
+
+class BaseUserPasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True, style={"input_type": "password"})
+    new_password = serializers.CharField(required=True, style={"input_type": "password"})
+    re_type_new_password = serializers.CharField(required=True, style={"input_type": "password"})
+    
+    
+class BaseUserPasswordForgotSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    
+    
+class BaseUserPasswordForgotActivationSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(required=True, style={"input_type": "password"})
+    re_type_password = serializers.CharField(required=True, style={"input_type": "password"})

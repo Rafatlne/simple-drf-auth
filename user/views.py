@@ -5,8 +5,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 
 
-from .serializers import BaseUserSerializer, UserCreateTokenSerializer, TokenSerializer, BaseUserCreatePasswordRetypeSerializer, BaseUserActivationSerializer
-from .services import BaseUserService, TokenCreateService,BasePassengerUserService
+from .serializers import BaseUserSerializer, UserCreateTokenSerializer, TokenSerializer, BaseUserCreatePasswordRetypeSerializer, BaseUserActivationSerializer, BaseUserPasswordChangeSerializer, BaseUserPasswordForgotSerializer, BaseUserPasswordForgotActivationSerializer
+from .services import BaseUserService, TokenCreateService, BasePassengerUserService
 
 User = get_user_model()
 
@@ -78,3 +78,38 @@ class BaseUserActivation(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user = self.service_class.update_status_from_activation(serializer.data)
         return Response({"detail" : "user has been activated"}, status=status.HTTP_200_OK)
+    
+    
+class BaseUserPasswordChangeViewset(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    service_class = BaseUserService()
+    serializer_class = BaseUserPasswordChangeSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def create(self, request, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = self.service_class.update_password(request.user, serializer.data)
+        return Response({"detail" : "password has been updated"}, status=status.HTTP_200_OK)
+    
+class BaseUserPasswordForgotViewset(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    service_class = BaseUserService()
+    serializer_class = BaseUserPasswordForgotSerializer
+    
+    def create(self, request, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        forget_password_url = self.service_class.forget_password_url(serializer.data)
+        return Response({"url" : forget_password_url}, status=status.HTTP_200_OK)
+
+class BaseUserPasswordForgotActivationViewset(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    service_class = BaseUserService()
+    serializer_class = BaseUserPasswordForgotActivationSerializer
+    
+    def create(self, request, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = self.service_class.forget_password_activation(serializer.data)
+        return Response({"detail" : "user password has been updated"}, status=status.HTTP_200_OK)
